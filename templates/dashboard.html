@@ -1,0 +1,61 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h2>Smart Refrigerator Dashboard</h2>
+
+<form action="/upload" method="POST" enctype="multipart/form-data">
+    <input type="file" name="image" required>
+    <button type="submit">Upload & Analyze</button>
+</form>
+
+<hr>
+
+<h3>Dashboard Statistics</h3>
+
+<p>Total Vegetables : {{ total }}</p>
+<p>Fresh : {{ fresh }}</p>
+<p>Spoiled : {{ spoiled }}</p>
+
+<hr>
+
+{% if result %}
+
+<h3>AI Detection Result</h3>
+
+<p><b>Vegetable :</b> {{ result.veg }}</p>
+<p><b>Freshness :</b> {{ result.fresh }}</p>
+<p><b>Expiry :</b> {{ result.expiry }}</p>
+
+<h3>Image Preview</h3>
+
+<img src="{{ url_for('static', filename='uploads/' + result.image) }}" width="200">
+
+{% endif %}
+
+<hr>
+
+<h3>Latest Records</h3>
+
+<table border="1">
+
+<tr>
+<th>Vegetable</th>
+<th>Freshness</th>
+<th>Expiry</th>
+<th>Date</th>
+</tr>
+
+{% for row in data %}
+
+<tr>
+<td>{{ row[1] }}</td>
+<td>{{ row[2] }}</td>
+<td>{{ row[3] }}</td>
+<td>{{ row[4] }}</td>
+</tr>
+
+{% endfor %}
+
+</table>
+
+{% endblock %}

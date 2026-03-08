@@ -1,0 +1,28 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<h2>Vegetable History</h2>
+
+<table border="1">
+
+<tr>
+<th>Vegetable</th>
+<th>Freshness</th>
+<th>Expiry</th>
+<th>Date</th>
+</tr>
+
+{% for row in data %}
+
+<tr>
+<td>{{ row[1] }}</td>
+<td>{{ row[2] }}</td>
+<td>{{ row[3] }}</td>
+<td>{{ row[4] }}</td>
+</tr>
+
+{% endfor %}
+
+</table>
+
+{% endblock %}
