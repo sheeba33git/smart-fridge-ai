@@ -197,7 +197,9 @@ def clear():
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    
     if getattr(sys, 'frozen', False):
-        app.run(debug=False, use_reloader=False)
+        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
     else:
-        app.run(debug=True)
+        app.run(host="0.0.0.0", port=port, debug=True)
