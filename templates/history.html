@@ -1,28 +1,21 @@
 {% extends "layout.html" %}
 {% block content %}
+<h2 style="text-align:center;">📜 History</h2>
 
-<h2>Vegetable History</h2>
-
-<table border="1">
-
+<table border="1" style="width:80%;margin:auto;text-align:center;">
 <tr>
-<th>Vegetable</th>
-<th>Freshness</th>
-<th>Expiry</th>
-<th>Date</th>
+<th>Image</th><th>Veg</th><th>Status</th><th>Qty</th><th>Date</th>
 </tr>
 
-{% for row in data %}
-
+{% for item in data %}
 <tr>
-<td>{{ row[1] }}</td>
-<td>{{ row[2] }}</td>
-<td>{{ row[3] }}</td>
-<td>{{ row[4] }}</td>
+<td><img src="{{ url_for('uploaded_file', filename=item[5]) }}" width="60"></td>
+<td>{{ item[1] }}</td>
+<td>{{ item[2] }}</td>
+<td>{{ item[6] }} kg</td>
+<td>{{ item[4] }}</td>
 </tr>
-
 {% endfor %}
-
 </table>
 
 {% endblock %}

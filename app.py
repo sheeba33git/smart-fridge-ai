@@ -1,60 +1,129 @@
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, redirect, url_for, send_from_directory
 import os
+import sys
 from datetime import datetime
 from werkzeug.utils import secure_filename
+import sqlite3
 
 from config import UPLOAD_FOLDER
-from database import create_tables, insert_data, get_all
+from database import create_tables, insert_data, get_all, update_quantity
+from ultralytics import YOLO
 
-# ---------------- AI MODULES ----------------
+# ---------------- PATH FIX ----------------
+def resource_path(relative_path):
+    try:
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
 
-try:
-    from models.vegetable_detector import detect_vegetable
-    from models.freshness_model import check_freshness
-    from models.expiry_predictor import predict_expiry
-except:
-    # fallback AI functions
-    def detect_vegetable(path):
-        return "Tomato"
+# ---------------- MODEL PATH ----------------
+if getattr(sys, 'frozen', False):
+    MODEL_PATH = os.path.join(os.path.dirname(sys.executable), "best.pt")
+else:
+    MODEL_PATH = "best.pt"
 
-    def check_freshness(path):
-        return "Fresh"
+yolo_model = YOLO(MODEL_PATH)
+print("🔥 MODEL CLASSES:", yolo_model.names)
 
-    def predict_expiry(veg, fresh):
-        if fresh == "Fresh":
-            return "3 Days"
-        return "0 Day"
+# ---------------- FLASK ----------------
+app = Flask(
+    __name__,
+    template_folder=resource_path("templates"),
+    static_folder=resource_path("static")
+)
 
-# ---------------- NOTIFICATION MODULE ----------------
-
-try:
-    from notifications.mobile_alert import send_mobile_alert
-except:
-    def send_mobile_alert(msg):
-        print("Mobile Alert:", msg)
-
-# ---------------- FLASK APP ----------------
-
-app = Flask(__name__)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# Ensure upload folder exists
-if not os.path.exists(UPLOAD_FOLDER):
-    os.makedirs(UPLOAD_FOLDER)
-
-# Create DB tables
 create_tables()
 
-# ---------------- DASHBOARD ----------------
+# ---------------- AI ----------------
 
+def detect_vegetable(path):
+    try:
+        results = yolo_model(path)[0]
+
+        probs = results.probs
+
+        if probs is None:
+            return "Unknown"
+
+        class_id = int(probs.top1)
+        label = yolo_model.names[class_id]
+
+        return label
+
+    except Exception as e:
+        print("Error:", e)
+        return "Unknown"
+
+def process_class(label):
+    label = label.lower()
+
+    # Vegetable detection
+    if "tomato" in label:
+        veg = "Tomato"
+    elif "potato" in label:
+        veg = "Potato"
+    elif "cabbage" in label:
+        veg = "Cabbage"
+    else:
+        veg = "Unknown"
+
+    # Freshness detection
+    if "fresh" in label:
+        fresh = "Fresh"
+    elif "rotten" in label:
+        fresh = "Spoiled"
+    else:
+        fresh = "Fresh"
+
+    return veg, fresh
+
+
+def predict_expiry(veg, fresh):
+    if fresh == "Spoiled":
+        return 0
+    return 5
+
+
+# ---------------- STOCK ----------------
+def calculate_stock(data):
+    stock = {}
+
+    for item in data:
+        veg = item[1]
+        qty = item[6]
+
+        if veg not in stock:
+            stock[veg] = 0
+
+        stock[veg] += qty
+
+    return stock
+
+
+# ---------------- ROUTES ----------------
+
+@app.route("/uploads/<filename>")
+def uploaded_file(filename):
+    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+
+
+# ✅ DASHBOARD
 @app.route("/")
 def dashboard():
-
     data = get_all()
 
     total = len(data)
     fresh = len([d for d in data if d[2] == "Fresh"])
     spoiled = len([d for d in data if d[2] == "Spoiled"])
+
+    stock = calculate_stock(data)
+
+    low_stock = [veg for veg, qty in stock.items() if qty < 1]
+    spoiled_items = [d for d in data if d[2] == "Spoiled"]
 
     return render_template(
         "dashboard.html",
@@ -62,81 +131,73 @@ def dashboard():
         total=total,
         fresh=fresh,
         spoiled=spoiled,
-        result=None
+        stock=stock,
+        low_stock=low_stock,
+        spoiled_items=spoiled_items
     )
 
-# ---------------- IMAGE UPLOAD ----------------
 
-@app.route("/upload", methods=["POST"])
-def upload():
-
-    if "image" not in request.files:
-        return "No file uploaded"
-
-    file = request.files["image"]
-
-    if file.filename == "":
-        return "No selected file"
-
-    filename = secure_filename(file.filename)
-
-    # 🔹 Ensure folder exists again before saving
-    upload_folder = app.config["UPLOAD_FOLDER"]
-    os.makedirs(upload_folder, exist_ok=True)
-
-    path = os.path.join(upload_folder, filename)
-
-    file.save(path)
-
-    # -------- AI Processing --------
-
-    veg = detect_vegetable(path)
-    fresh = check_freshness(path)
-    expiry = predict_expiry(veg, fresh)
-
-    date = datetime.now().strftime("%Y-%m-%d %H:%M")
-
-    insert_data(veg, fresh, expiry, date)
-
-    # -------- Mobile Notification --------
-
-    if fresh == "Spoiled":
-        send_mobile_alert(f"{veg} is spoiled in refrigerator")
-
-    # -------- Dashboard Data --------
-
-    data = get_all()
-
-    total = len(data)
-    fresh_count = len([d for d in data if d[2] == "Fresh"])
-    spoiled = len([d for d in data if d[2] == "Spoiled"])
-
-    result = {
-        "veg": veg,
-        "fresh": fresh,
-        "expiry": expiry,
-        "image": filename
-    }
-
-    return render_template(
-        "dashboard.html",
-        data=data,
-        total=total,
-        fresh=fresh_count,
-        spoiled=spoiled,
-        result=result
-    )
-
-# ---------------- HISTORY PAGE ----------------
-
+# ✅ HISTORY
 @app.route("/history")
 def history():
-
     data = get_all()
-
     return render_template("history.html", data=data)
 
-# ---------------- RUN APP ----------------
 
+# ✅ UPLOAD
+@app.route("/upload", methods=["POST"])
+def upload():
+    file = request.files["image"]
+    quantity = float(request.form.get("quantity", 1))
+
+    filename = secure_filename(file.filename)
+    path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+    file.save(path)
+
+    # AI detection
+    label = detect_vegetable(path)
+    veg, fresh = process_class(label)
+
+    expiry = predict_expiry(veg, fresh)
+
+    insert_data(
+        veg,
+        fresh,
+        expiry,
+        datetime.now().strftime("%Y-%m-%d %H:%M"),
+        filename,
+        quantity
+    )
+
+    return redirect(url_for("dashboard"))
+
+
+# ✅ REMOVE ITEM
+@app.route("/remove", methods=["POST"])
+def remove():
+    veg = request.form.get("veg")
+    quantity = float(request.form.get("quantity"))
+
+    update_quantity(veg, quantity)
+
+    return redirect(url_for("dashboard"))
+
+
+# ✅ CLEAR ALL
+@app.route("/clear", methods=["POST"])
+def clear():
+    conn = sqlite3.connect("fridge.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM fridge")
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for("dashboard"))
+
+
+# ---------------- RUN ----------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    if getattr(sys, 'frozen', False):
+        app.run(debug=False, use_reloader=False)
+    else:
+        app.run(debug=True)

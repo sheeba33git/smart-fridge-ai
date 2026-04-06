@@ -1,0 +1,20 @@
+train: E:/smart-fridge-AI/dataset/train
+val: E:/smart-fridge-AI/dataset/valid
+
+nc: 14
+
+names:
+  0: FreshTomato
+  1: RottenTomato
+  2: FreshPotato
+  3: RottenPotato
+  4: FreshCarrot
+  5: RottenCarrot
+  6: FreshCabbage
+  7: RottenCabbage
+  8: FreshBrinjal
+  9: RottenBrinjal
+  10: FreshApple
+  11: RottenApple
+  12: freshbanana
+  13: rottenbanana

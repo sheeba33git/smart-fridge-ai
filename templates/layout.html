@@ -2,20 +2,90 @@
 <html>
 
 <head>
+    <title>Smart Refrigerator AI</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <style>
+        /* Card icons */
+        .card-icon {
+            font-size: 40px;
+        }
 
-<title>Smart Refrigerator AI</title>
+        /* Expiry coloring */
+        .expiry-good {
+            background-color: #d4edda;
+        }
 
+        .expiry-warning {
+            background-color: #fff3cd;
+        }
+
+        .expiry-danger {
+            background-color: #f8d7da;
+        }
+
+        /* Video background */
+        .bg-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1; /* behind content */
+            overflow: hidden;
+            opacity: 0.35; /* adjust for subtle effect */
+        }
+
+        .bg-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            filter: blur(2px); /* optional blur for readability */
+        }
+
+        /* Content wrapper to stay above video */
+        .content-wrapper {
+            position: relative;
+            z-index: 1;
+            padding-top: 20px;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+    </style>
 </head>
 
-<body>
+<body class="bg-light">
 
-<a href="/">Dashboard</a> |
-<a href="/history">History</a>
+    <!-- Video Background -->
+    <div class="bg-container">
+        <video autoplay muted loop>
+            <source src="{{ url_for('static', filename='videos/vege_bg.mp4') }}" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+    </div>
 
-<hr>
+    <!-- Navbar -->
+    <nav class="navbar navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">Smart Refrigerator AI</a>
+            <div>
+                <a class="btn btn-outline-light me-2" href="/">Dashboard</a>
+                <a class="btn btn-outline-light" href="/history">History</a>
+            </div>
+        </div>
+    </nav>
 
-{% block content %}{% endblock %}
+    <!-- Main Content -->
+    <div class="container mt-4 content-wrapper">
+        {% block content %}{% endblock %}
+    </div>
 
 </body>
-
 </html>

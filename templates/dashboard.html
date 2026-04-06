@@ -1,61 +1,109 @@
 {% extends "layout.html" %}
+
 {% block content %}
+<h2 style="text-align:center;">📊 Smart Fridge Dashboard</h2>
 
-<h2>Smart Refrigerator Dashboard</h2>
-
-<form action="/upload" method="POST" enctype="multipart/form-data">
-    <input type="file" name="image" required>
-    <button type="submit">Upload & Analyze</button>
-</form>
-
-<hr>
-
-<h3>Dashboard Statistics</h3>
-
-<p>Total Vegetables : {{ total }}</p>
-<p>Fresh : {{ fresh }}</p>
-<p>Spoiled : {{ spoiled }}</p>
-
-<hr>
-
-{% if result %}
-
-<h3>AI Detection Result</h3>
-
-<p><b>Vegetable :</b> {{ result.veg }}</p>
-<p><b>Freshness :</b> {{ result.fresh }}</p>
-<p><b>Expiry :</b> {{ result.expiry }}</p>
-
-<h3>Image Preview</h3>
-
-<img src="{{ url_for('static', filename='uploads/' + result.image) }}" width="200">
-
+<!-- ALERTS -->
+{% if low_stock %}
+<div style="background:#fff3cd;padding:10px;border-radius:8px;">
+⚠️ Low Stock:
+{% for veg in low_stock %}
+<strong>{{ veg }}</strong>,
+{% endfor %}
+</div>
 {% endif %}
 
-<hr>
+{% if spoiled_items %}
+<div style="background:#f8d7da;padding:10px;border-radius:8px;margin-top:10px;">
+❌ Spoiled:
+{% for item in spoiled_items %}
+<strong>{{ item[1] }}</strong>,
+{% endfor %}
+</div>
+{% endif %}
 
-<h3>Latest Records</h3>
+<!-- CARDS -->
+<div style="display:flex;gap:20px;justify-content:center;margin:20px;">
+<div class="card p-2 bg-primary text-white">Total: {{ total }}</div>
+<div class="card p-2 bg-success text-white">Fresh: {{ fresh }}</div>
+<div class="card p-2 bg-danger text-white">Spoiled: {{ spoiled }}</div>
+</div>
 
-<table border="1">
+<!-- GRAPH -->
+<div style="width:250px;margin:auto;">
+<canvas id="chart"></canvas>
+</div>
 
-<tr>
-<th>Vegetable</th>
-<th>Freshness</th>
-<th>Expiry</th>
-<th>Date</th>
-</tr>
+<!-- UPLOAD -->
+<h3>Upload</h3>
+<form action="/upload" method="POST" enctype="multipart/form-data">
+<input type="file" name="image" required>
+<input type="number" step="0.1" name="quantity" placeholder="kg" required>
+<button type="submit">Add</button>
+</form>
 
-{% for row in data %}
+<!-- CLEAR -->
+<form action="/clear" method="POST" style="margin-top:10px;">
+<button style="background:red;color:white;">Clear All</button>
+</form>
 
-<tr>
-<td>{{ row[1] }}</td>
-<td>{{ row[2] }}</td>
-<td>{{ row[3] }}</td>
-<td>{{ row[4] }}</td>
-</tr>
+<!-- STOCK -->
+<h3>📦 Stock</h3>
+<ul>
+{% for veg, qty in stock.items() %}
+<li>{{ veg }} : {{ qty }} kg</li>
+{% endfor %}
+</ul>
 
+<!-- ITEMS (ONE CARD PER VEGETABLE) -->
+<div style="display:flex;flex-wrap:wrap;gap:15px;justify-content:center;">
+
+{% for item in data %}
+<div style="width:200px;padding:12px;box-shadow:0 2px 8px gray;border-radius:12px;background:white;">
+
+<!-- IMAGE -->
+<img src="{{ url_for('uploaded_file', filename=item[5]) }}" width="100%" style="border-radius:8px;">
+
+<!-- NAME -->
+<h4 style="margin-top:10px;">{{ item[1] }}</h4>
+
+<!-- QUANTITY -->
+<p><strong>{{ item[6] }} kg</strong></p>
+
+<!-- FRESHNESS -->
+<p style="color:{% if item[2]=='Fresh' %}green{% else %}red{% endif %};font-weight:bold;">
+{{ item[2] }}
+</p>
+
+<!-- REMOVE -->
+<form action="/remove" method="POST" style="display:flex;gap:5px;">
+<input type="hidden" name="veg" value="{{ item[1] }}">
+<input type="number" step="0.1" name="quantity" placeholder="kg" required style="width:70px;">
+<button type="submit" style="background:red;color:white;border:none;padding:5px 10px;border-radius:6px;">
+Remove
+</button>
+</form>
+
+</div>
 {% endfor %}
 
-</table>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+new Chart(document.getElementById("chart"), {
+type: "doughnut",
+data: {
+labels: ["Fresh","Spoiled"],
+datasets: [{
+data: [{{ fresh }}, {{ spoiled }}]
+}]
+},
+options:{
+responsive:true,
+maintainAspectRatio:false
+}
+});
+</script>
 
 {% endblock %}
