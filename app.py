@@ -23,8 +23,15 @@ if getattr(sys, 'frozen', False):
 else:
     MODEL_PATH = "best.pt"
 
-yolo_model = YOLO(MODEL_PATH)
-print("🔥 MODEL CLASSES:", yolo_model.names)
+# ---------------- LAZY LOAD MODEL ----------------
+model = None
+
+def get_model():
+    global model
+    if model is None:
+        model = YOLO(MODEL_PATH)
+        print("🔥 MODEL LOADED")
+    return model
 
 # ---------------- FLASK ----------------
 app = Flask(
@@ -39,10 +46,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 create_tables()
 
 # ---------------- AI ----------------
-
 def detect_vegetable(path):
     try:
-        results = yolo_model(path)[0]
+        model = get_model()
+        results = model(path)[0]
 
         probs = results.probs
 
@@ -50,13 +57,14 @@ def detect_vegetable(path):
             return "Unknown"
 
         class_id = int(probs.top1)
-        label = yolo_model.names[class_id]
+        label = model.names[class_id]
 
         return label
 
     except Exception as e:
         print("Error:", e)
         return "Unknown"
+
 
 def process_class(label):
     label = label.lower()
