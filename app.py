@@ -30,6 +30,8 @@ def get_model():
     global model
     if model is None:
         model = YOLO(MODEL_PATH)
+        print("MODEL TYPE:", model.task)
+        print("🔥 MODEL CLASSES:", model.names)
         print("🔥 MODEL LOADED")
     return model
 
@@ -51,15 +53,19 @@ def detect_vegetable(path):
         model = get_model()
         results = model(path)[0]
 
-        probs = results.probs
+        # ✅ HANDLE CLASSIFICATION MODEL
+        if results.probs is not None:
+            class_id = int(results.probs.top1)
+            label = model.names[class_id]
+            return label
 
-        if probs is None:
-            return "Unknown"
+        # ✅ HANDLE DETECTION MODEL (fallback)
+        if results.boxes is not None and len(results.boxes) > 0:
+            class_id = int(results.boxes.cls[0])
+            label = model.names[class_id]
+            return label
 
-        class_id = int(probs.top1)
-        label = model.names[class_id]
-
-        return label
+        return "Unknown"
 
     except Exception as e:
         print("Error:", e)
@@ -69,7 +75,6 @@ def detect_vegetable(path):
 def process_class(label):
     label = label.lower()
 
-    # Vegetable detection
     if "tomato" in label:
         veg = "Tomato"
     elif "potato" in label:
@@ -79,7 +84,6 @@ def process_class(label):
     else:
         veg = "Unknown"
 
-    # Freshness detection
     if "fresh" in label:
         fresh = "Fresh"
     elif "rotten" in label:
@@ -99,7 +103,6 @@ def predict_expiry(veg, fresh):
 # ---------------- STOCK ----------------
 def calculate_stock(data):
     stock = {}
-
     for item in data:
         veg = item[1]
         qty = item[6]
@@ -119,7 +122,6 @@ def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
 
 
-# ✅ DASHBOARD
 @app.route("/")
 def dashboard():
     data = get_all()
@@ -145,14 +147,12 @@ def dashboard():
     )
 
 
-# ✅ HISTORY
 @app.route("/history")
 def history():
     data = get_all()
     return render_template("history.html", data=data)
 
 
-# ✅ UPLOAD
 @app.route("/upload", methods=["POST"])
 def upload():
     file = request.files["image"]
@@ -162,7 +162,6 @@ def upload():
     path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
     file.save(path)
 
-    # AI detection
     label = detect_vegetable(path)
     veg, fresh = process_class(label)
 
@@ -180,18 +179,15 @@ def upload():
     return redirect(url_for("dashboard"))
 
 
-# ✅ REMOVE ITEM
 @app.route("/remove", methods=["POST"])
 def remove():
     veg = request.form.get("veg")
     quantity = float(request.form.get("quantity"))
 
     update_quantity(veg, quantity)
-
     return redirect(url_for("dashboard"))
 
 
-# ✅ CLEAR ALL
 @app.route("/clear", methods=["POST"])
 def clear():
     conn = sqlite3.connect("fridge.db")
