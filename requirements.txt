@@ -9,4 +9,4 @@ pillow==9.5.0
 torch==1.13.1
 torchvision==0.14.1
 
-setuptools>=65.5.0
+setuptools==65.5.0
