@@ -77,81 +77,66 @@ def detect_vegetable(path):
 
         result = results[0]
 
-        # ✅ METHOD 1 (official way)
-        try:
-            if result.probs is not None:
+        # 🔥 MOST STABLE METHOD
+        if hasattr(result, "names") and hasattr(result, "probs"):
+
+            try:
+                # direct top1
                 class_id = int(result.probs.top1)
                 label = result.names[class_id]
-                print(f"✅ Predicted (top1): {label}")
+
+                print("✅ Predicted:", label)
                 return label
-        except:
-            pass
 
-        # ✅ METHOD 2 (fallback for numpy issue)
-        try:
-            probs = result.probs
+            except Exception as e:
+                print("⚠️ top1 failed, using manual fallback:", e)
 
-            # force convert safely
-            if hasattr(probs, "data"):
-                probs = probs.data
+                import numpy as np
 
-            if hasattr(probs, "cpu"):
-                probs = probs.cpu()
+                probs = result.probs
 
-            if hasattr(probs, "numpy"):
-                probs = probs.numpy()
+                # convert everything safely
+                if hasattr(probs, "data"):
+                    probs = probs.data
 
-            import numpy as np
-            class_id = int(np.argmax(probs))
-            label = model.names[class_id]
+                try:
+                    probs = probs.cpu().numpy()
+                except:
+                    probs = np.array(probs)
 
-            print(f"✅ Predicted (fallback): {label}")
-            return label
-        except:
-            pass
+                class_id = int(np.argmax(probs))
+                label = result.names[class_id]
+
+                print("✅ Fallback Predicted:", label)
+                return label
 
         return "Unknown"
 
     except Exception as e:
-        print("❌ Prediction Error:", e)
+        print("❌ FINAL ERROR:", e)
         return "Unknown"
-
 
 # ---------------- PROCESS ----------------
 def process_class(label):
     label = label.lower()
 
+    if "potato" in label:
+        return "Potato", "Fresh" if "fresh" in label else "Spoiled"
     if "tomato" in label:
-        veg = "Tomato"
-    elif "potato" in label:
-        veg = "Potato"
-    elif "cabbage" in label:
-        veg = "Cabbage"
-    elif "brinjal" in label or "brijal" in label:
-        veg = "Brinjal"
-    elif "carrot" in label:
-        veg = "Carrot"
-    elif "apple" in label:
-        veg = "Apple"
-    elif "banana" in label:
-        veg = "Banana"
-    else:
-        veg = "Unknown"
+        return "Tomato", "Fresh" if "fresh" in label else "Spoiled"
+    if "cabbage" in label:
+        return "Cabbage", "Fresh" if "fresh" in label else "Spoiled"
+    if "brinjal" in label or "brijal" in label:
+        return "Brinjal", "Fresh" if "fresh" in label else "Spoiled"
+    if "carrot" in label:
+        return "Carrot", "Fresh" if "fresh" in label else "Spoiled"
+    if "banana" in label:
+        return "Banana", "Fresh" if "fresh" in label else "Spoiled"
+    if "apple" in label:
+        return "Apple", "Fresh" if "fresh" in label else "Spoiled"
 
-    if "fresh" in label:
-        fresh = "Fresh"
-    elif "rotten" in label:
-        fresh = "Spoiled"
-    else:
-        fresh = "Fresh"
-
-    return veg, fresh
-
-def predict_expiry(veg, fresh):
-    if fresh == "Spoiled":
-        return 0
-    return 5
-
+    print("⚠️ UNKNOWN LABEL RECEIVED:", label)
+    return "Unknown", "Fresh"
 # ---------------- STOCK ----------------
 def calculate_stock(data):
     stock = {}
@@ -211,6 +196,10 @@ def upload():
     file.save(path)
 
     label = detect_vegetable(path)
+
+    # ✅ PRINT HERE (VERY IMPORTANT)
+    print("🔥 RAW LABEL FROM MODEL:", label)
+
     veg, fresh = process_class(label)
     expiry = predict_expiry(veg, fresh)
 
@@ -224,7 +213,6 @@ def upload():
     )
 
     return redirect(url_for("dashboard"))
-
 @app.route("/remove", methods=["POST"])
 def remove():
     veg = request.form.get("veg")
