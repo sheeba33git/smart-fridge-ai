@@ -67,22 +67,33 @@ def detect_vegetable(path):
     try:
         model = get_model()
 
-        if model is None:
-            return "Unknown"
-
         results = model(path)
 
-        # ✅ ALWAYS TAKE FIRST RESULT SAFELY
-        result = results[0]
+        # Take first result safely
+        r = results[0]
 
-        # ✅ SAFE PROBABILITY HANDLING
-        if hasattr(result, "probs") and result.probs is not None:
-            probs = result.probs.data.cpu().numpy()   # ✅ FIX
+        # ✅ Classification model handling (robust)
+        if hasattr(r, "probs") and r.probs is not None:
 
-            class_id = probs.argmax()                 # ✅ FIX
+            probs = r.probs
+
+            # Handle both tensor and numpy cases
+            if hasattr(probs, "data"):
+                probs = probs.data
+
+            if hasattr(probs, "cpu"):
+                probs = probs.cpu().numpy()
+
+            # If already numpy, no problem
+            import numpy as np
+            if isinstance(probs, np.ndarray):
+                class_id = int(probs.argmax())
+            else:
+                class_id = int(probs.top1)
+
             label = model.names[class_id]
 
-            print("Predicted:", label)
+            print("✅ Predicted:", label)
             return label
 
         return "Unknown"
@@ -90,7 +101,6 @@ def detect_vegetable(path):
     except Exception as e:
         print("❌ Prediction Error:", e)
         return "Unknown"
-
 # ---------------- PROCESS ----------------
 def process_class(label):
     label = label.lower()
