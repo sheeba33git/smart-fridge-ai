@@ -70,7 +70,7 @@ def detect_vegetable(path):
 
         result = results[0]
 
-        # ✅ FIXED: Proper classification handling
+        # ✅ Correct way for classification
         if hasattr(result, "probs") and result.probs is not None:
             probs = result.probs.data.cpu().numpy()
 
