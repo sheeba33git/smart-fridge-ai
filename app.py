@@ -70,10 +70,22 @@ def detect_vegetable(path):
 
         result = results[0]
 
-        # ✅ Correct way for classification
+        # ✅ Handle classification safely for ALL cases
         if hasattr(result, "probs") and result.probs is not None:
-            probs = result.probs.data.cpu().numpy()
 
+            probs = result.probs
+
+            # 🔥 HANDLE ALL TYPES
+            if hasattr(probs, "data"):
+                probs = probs.data
+
+            if hasattr(probs, "cpu"):
+                probs = probs.cpu()
+
+            if hasattr(probs, "numpy"):
+                probs = probs.numpy()
+
+            # now it's guaranteed numpy
             class_id = int(probs.argmax())
             confidence = float(probs.max())
 
