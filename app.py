@@ -77,21 +77,45 @@ def detect_vegetable(path):
 
         result = results[0]
 
-        # ✅ Correct way for classification model
-        if hasattr(result, "probs") and result.probs is not None:
-            class_id = int(result.probs.top1)
-            label = result.names[class_id]
-            confidence = float(result.probs.top1conf)
+        # ✅ METHOD 1 (official way)
+        try:
+            if result.probs is not None:
+                class_id = int(result.probs.top1)
+                label = result.names[class_id]
+                print(f"✅ Predicted (top1): {label}")
+                return label
+        except:
+            pass
 
-            print(f"✅ Predicted: {label} ({confidence:.2f})")
+        # ✅ METHOD 2 (fallback for numpy issue)
+        try:
+            probs = result.probs
 
+            # force convert safely
+            if hasattr(probs, "data"):
+                probs = probs.data
+
+            if hasattr(probs, "cpu"):
+                probs = probs.cpu()
+
+            if hasattr(probs, "numpy"):
+                probs = probs.numpy()
+
+            import numpy as np
+            class_id = int(np.argmax(probs))
+            label = model.names[class_id]
+
+            print(f"✅ Predicted (fallback): {label}")
             return label
+        except:
+            pass
 
         return "Unknown"
 
     except Exception as e:
         print("❌ Prediction Error:", e)
         return "Unknown"
+
 
 # ---------------- PROCESS ----------------
 def process_class(label):
