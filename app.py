@@ -68,40 +68,19 @@ def detect_vegetable(path):
         model = get_model()
         results = model(path)
 
-        r = results[0]
+        result = results[0]
 
-        # 🔥 SAFEST WAY (works for ALL ultralytics versions)
-        probs = None
+        # ✅ FIXED: Proper classification handling
+        if hasattr(result, "probs") and result.probs is not None:
+            probs = result.probs.data.cpu().numpy()
 
-        if hasattr(r, "probs") and r.probs is not None:
-            probs = r.probs
-
-            # Convert safely
-            try:
-                probs = probs.data
-            except:
-                pass
-
-            try:
-                probs = probs.cpu()
-            except:
-                pass
-
-            try:
-                probs = probs.numpy()
-            except:
-                pass
-
-        # If we successfully got probabilities
-        if probs is not None:
-            import numpy as np
-
-            probs = np.array(probs)   # 🔥 force conversion
-            class_id = int(np.argmax(probs))
+            class_id = int(probs.argmax())
+            confidence = float(probs.max())
 
             label = model.names[class_id]
 
-            print("✅ Predicted:", label)
+            print(f"✅ Predicted: {label} ({confidence:.2f})")
+
             return label
 
         return "Unknown"
