@@ -18,10 +18,12 @@ def resource_path(relative_path):
     return os.path.join(base_path, relative_path)
 
 # ---------------- MODEL PATH ----------------
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
 if getattr(sys, 'frozen', False):
     MODEL_PATH = os.path.join(os.path.dirname(sys.executable), "best.pt")
 else:
-    MODEL_PATH = "best.pt"
+    MODEL_PATH = os.path.join(BASE_DIR, "best.pt")   # ✅ FIXED
 
 # ---------------- LAZY LOAD MODEL ----------------
 model = None
@@ -29,10 +31,23 @@ model = None
 def get_model():
     global model
     if model is None:
-        model = YOLO(MODEL_PATH)
-        print("MODEL TYPE:", model.task)
-        print("🔥 MODEL CLASSES:", model.names)
-        print("🔥 MODEL LOADED")
+        try:
+            print("Loading model from:", MODEL_PATH)
+
+            if not os.path.exists(MODEL_PATH):
+                print("❌ ERROR: best.pt not found!")
+                return None
+
+            model = YOLO(MODEL_PATH)
+
+            print("✅ MODEL TYPE:", model.task)
+            print("✅ MODEL CLASSES:", model.names)
+            print("🔥 MODEL LOADED SUCCESSFULLY")
+
+        except Exception as e:
+            print("❌ MODEL LOAD ERROR:", e)
+            model = None
+
     return model
 
 # ---------------- FLASK ----------------
@@ -51,27 +66,33 @@ create_tables()
 def detect_vegetable(path):
     try:
         model = get_model()
+
+        if model is None:
+            return "Unknown"
+
         results = model(path)[0]
 
-        # ✅ HANDLE CLASSIFICATION MODEL
+        # ✅ CLASSIFICATION MODEL
         if results.probs is not None:
             class_id = int(results.probs.top1)
             label = model.names[class_id]
+            print("Predicted:", label)
             return label
 
-        # ✅ HANDLE DETECTION MODEL (fallback)
+        # ✅ DETECTION MODEL (fallback)
         if results.boxes is not None and len(results.boxes) > 0:
             class_id = int(results.boxes.cls[0])
             label = model.names[class_id]
+            print("Detected:", label)
             return label
 
         return "Unknown"
 
     except Exception as e:
-        print("Error:", e)
+        print("❌ Prediction Error:", e)
         return "Unknown"
 
-
+# ---------------- PROCESS ----------------
 def process_class(label):
     label = label.lower()
 
@@ -93,16 +114,15 @@ def process_class(label):
 
     return veg, fresh
 
-
 def predict_expiry(veg, fresh):
     if fresh == "Spoiled":
         return 0
     return 5
 
-
 # ---------------- STOCK ----------------
 def calculate_stock(data):
     stock = {}
+
     for item in data:
         veg = item[1]
         qty = item[6]
@@ -114,13 +134,10 @@ def calculate_stock(data):
 
     return stock
 
-
 # ---------------- ROUTES ----------------
-
 @app.route("/uploads/<filename>")
 def uploaded_file(filename):
     return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
-
 
 @app.route("/")
 def dashboard():
@@ -146,12 +163,10 @@ def dashboard():
         spoiled_items=spoiled_items
     )
 
-
 @app.route("/history")
 def history():
     data = get_all()
     return render_template("history.html", data=data)
-
 
 @app.route("/upload", methods=["POST"])
 def upload():
@@ -164,7 +179,6 @@ def upload():
 
     label = detect_vegetable(path)
     veg, fresh = process_class(label)
-
     expiry = predict_expiry(veg, fresh)
 
     insert_data(
@@ -178,7 +192,6 @@ def upload():
 
     return redirect(url_for("dashboard"))
 
-
 @app.route("/remove", methods=["POST"])
 def remove():
     veg = request.form.get("veg")
@@ -186,7 +199,6 @@ def remove():
 
     update_quantity(veg, quantity)
     return redirect(url_for("dashboard"))
-
 
 @app.route("/clear", methods=["POST"])
 def clear():
@@ -198,8 +210,7 @@ def clear():
 
     return redirect(url_for("dashboard"))
 
-
 # ---------------- RUN ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port, debug=False)
