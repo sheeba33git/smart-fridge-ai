@@ -66,30 +66,38 @@ create_tables()
 def detect_vegetable(path):
     try:
         model = get_model()
-
         results = model(path)
 
-        # Take first result safely
         r = results[0]
 
-        # ✅ Classification model handling (robust)
-        if hasattr(r, "probs") and r.probs is not None:
+        # 🔥 SAFEST WAY (works for ALL ultralytics versions)
+        probs = None
 
+        if hasattr(r, "probs") and r.probs is not None:
             probs = r.probs
 
-            # Handle both tensor and numpy cases
-            if hasattr(probs, "data"):
+            # Convert safely
+            try:
                 probs = probs.data
+            except:
+                pass
 
-            if hasattr(probs, "cpu"):
-                probs = probs.cpu().numpy()
+            try:
+                probs = probs.cpu()
+            except:
+                pass
 
-            # If already numpy, no problem
+            try:
+                probs = probs.numpy()
+            except:
+                pass
+
+        # If we successfully got probabilities
+        if probs is not None:
             import numpy as np
-            if isinstance(probs, np.ndarray):
-                class_id = int(probs.argmax())
-            else:
-                class_id = int(probs.top1)
+
+            probs = np.array(probs)   # 🔥 force conversion
+            class_id = int(np.argmax(probs))
 
             label = model.names[class_id]
 
