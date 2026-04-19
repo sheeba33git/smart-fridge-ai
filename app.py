@@ -70,20 +70,19 @@ def detect_vegetable(path):
         if model is None:
             return "Unknown"
 
-        results = model(path)[0]
+        results = model(path)
 
-        # ✅ CLASSIFICATION MODEL
-        if results.probs is not None:
-            class_id = int(results.probs.top1)
+        # ✅ ALWAYS TAKE FIRST RESULT SAFELY
+        result = results[0]
+
+        # ✅ SAFE PROBABILITY HANDLING
+        if hasattr(result, "probs") and result.probs is not None:
+            probs = result.probs.data.cpu().numpy()   # ✅ FIX
+
+            class_id = probs.argmax()                 # ✅ FIX
             label = model.names[class_id]
+
             print("Predicted:", label)
-            return label
-
-        # ✅ DETECTION MODEL (fallback)
-        if results.boxes is not None and len(results.boxes) > 0:
-            class_id = int(results.boxes.cls[0])
-            label = model.names[class_id]
-            print("Detected:", label)
             return label
 
         return "Unknown"
