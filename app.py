@@ -23,7 +23,7 @@ BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 if getattr(sys, 'frozen', False):
     MODEL_PATH = os.path.join(os.path.dirname(sys.executable), "best.pt")
 else:
-    MODEL_PATH = os.path.join(BASE_DIR, "best.pt")   # ✅ FIXED
+    MODEL_PATH = os.path.join(BASE_DIR, "best.pt")
 
 # ---------------- LAZY LOAD MODEL ----------------
 model = None
@@ -66,30 +66,22 @@ create_tables()
 def detect_vegetable(path):
     try:
         model = get_model()
+
+        if model is None:
+            return "Unknown"
+
         results = model(path)
+
+        if not results:
+            return "Unknown"
 
         result = results[0]
 
-        # ✅ Handle classification safely for ALL cases
+        # ✅ Correct way for classification model
         if hasattr(result, "probs") and result.probs is not None:
-
-            probs = result.probs
-
-            # 🔥 HANDLE ALL TYPES
-            if hasattr(probs, "data"):
-                probs = probs.data
-
-            if hasattr(probs, "cpu"):
-                probs = probs.cpu()
-
-            if hasattr(probs, "numpy"):
-                probs = probs.numpy()
-
-            # now it's guaranteed numpy
-            class_id = int(probs.argmax())
-            confidence = float(probs.max())
-
-            label = model.names[class_id]
+            class_id = int(result.probs.top1)
+            label = result.names[class_id]
+            confidence = float(result.probs.top1conf)
 
             print(f"✅ Predicted: {label} ({confidence:.2f})")
 
@@ -100,6 +92,7 @@ def detect_vegetable(path):
     except Exception as e:
         print("❌ Prediction Error:", e)
         return "Unknown"
+
 # ---------------- PROCESS ----------------
 def process_class(label):
     label = label.lower()
@@ -110,6 +103,14 @@ def process_class(label):
         veg = "Potato"
     elif "cabbage" in label:
         veg = "Cabbage"
+    elif "brinjal" in label or "brijal" in label:
+        veg = "Brinjal"
+    elif "carrot" in label:
+        veg = "Carrot"
+    elif "apple" in label:
+        veg = "Apple"
+    elif "banana" in label:
+        veg = "Banana"
     else:
         veg = "Unknown"
 
