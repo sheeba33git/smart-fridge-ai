@@ -5,6 +5,7 @@ from datetime import datetime
 from werkzeug.utils import secure_filename
 import sqlite3
 import logging
+import numpy as np
 
 from config import UPLOAD_FOLDER
 from database import create_tables, insert_data, get_all, update_quantity
@@ -81,85 +82,58 @@ def detect_vegetable(path):
             return "Unknown"
 
         result = results[0]
-
-        # ==============================
-        # 🔥 FORCE HANDLE ALL CASES
-        # ==============================
         probs = getattr(result, "probs", None)
 
-        if probs is not None:
-            try:
-                # ✅ METHOD 1 (works locally)
-                class_id = int(probs.top1)
-                label = model.names[class_id]
-                print("✅ TOP1:", label)
-                return label
-            except Exception as e:
-                print("⚠️ top1 failed:", e)
+        if probs is None:
+            print("❌ No probs attribute in result")
+            return "Unknown"
 
-                try:
-                    # ✅ METHOD 2 (tensor → numpy safe)
-                    import numpy as np
+        # ✅ FIXED: Normalize tensor → CPU → numpy → flat array
+        # Works on ALL environments: local, Render, CPU-only, GPU
+        data = probs.data
+        if hasattr(data, "cpu"):
+            data = data.cpu()
+        if hasattr(data, "numpy"):
+            data = data.numpy()
 
-                    data = probs.data
+        data = np.array(data).flatten()
 
-                    if hasattr(data, "cpu"):
-                        data = data.cpu().numpy()
-                    else:
-                        data = np.array(data)
+        class_id = int(np.argmax(data))
+        confidence = float(data[class_id])
 
-                    class_id = int(np.argmax(data))
-                    label = model.names[class_id]
+        if confidence < 0.4:
+            print(f"⚠️ Low confidence ({confidence:.2f}), returning Unknown")
+            return "Unknown"
 
-                    print("✅ NUMPY FIX:", label)
-                    return label
-
-                except Exception as e2:
-                    print("❌ numpy fix failed:", e2)
-
-        # ==============================
-        # 🔥 LAST FALLBACK (IMPORTANT)
-        # ==============================
-        try:
-            # Sometimes classification output is hidden in names
-            print("⚠️ Trying fallback using names")
-
-            # force highest probability manually
-            raw = str(result)
-
-            for i, name in model.names.items():
-                if name.lower() in raw.lower():
-                    print("✅ STRING MATCH:", name)
-                    return name
-
-        except Exception as e:
-            print("❌ fallback string error:", e)
-
-        print("❌ FINAL: Unknown")
-        return "Unknown"
+        label = model.names[class_id]
+        print(f"✅ Detected: {label} (confidence: {confidence:.2f})")
+        return label
 
     except Exception as e:
-        print("❌ FINAL ERROR:", e)
+        print(f"❌ detect_vegetable ERROR: {e}")
         return "Unknown"
 
 # ---------------- PROCESS ----------------
 def process_class(label):
     label = label.lower()
 
-    if "potato" in label:
-        return "Potato", "Fresh" if "fresh" in label else "Spoiled"
-    elif "tomato" in label:
-        return "Tomato", "Fresh" if "fresh" in label else "Spoiled"
+    # ✅ FIXED: Model outputs "Rotten", not "Spoiled" — check prefix correctly
+    fresh = "Fresh" if label.startswith("fresh") else "Spoiled"
+
+    if "tomato" in label:
+        return "Tomato", fresh
+    elif "potato" in label:
+        return "Potato", fresh
     elif "cabbage" in label:
-        return "Cabbage", "Fresh" if "fresh" in label else "Spoiled"
+        return "Cabbage", fresh
     elif "brinjal" in label or "brijal" in label:
-        return "Brinjal", "Fresh" if "fresh" in label else "Spoiled"
+        return "Brinjal", fresh
     elif "carrot" in label:
-        return "Carrot", "Fresh" if "fresh" in label else "Spoiled"
+        return "Carrot", fresh
     elif "banana" in label:
-        return "Banana", "Fresh" if "fresh" in label else "Spoiled"
+        return "Banana", fresh
     elif "apple" in label:
-        return "Apple", "Fresh" if "fresh" in label else "Spoiled"
+        return "Apple", fresh
 
     print("⚠️ UNKNOWN LABEL:", label)
     return "Unknown", "Fresh"
