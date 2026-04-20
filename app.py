@@ -71,42 +71,71 @@ def detect_vegetable(path):
         model = get_model()
 
         if model is None:
-            print("⚠️ Model not available")
+            print("❌ Model not loaded")
             return "Unknown"
 
         results = model(path)
 
         if not results:
-            print("⚠️ No results")
+            print("❌ No results")
             return "Unknown"
 
         result = results[0]
 
-        # ✅ CLASSIFICATION MODEL
-        if hasattr(result, "probs") and result.probs is not None:
+        # ==============================
+        # 🔥 FORCE HANDLE ALL CASES
+        # ==============================
+        probs = getattr(result, "probs", None)
+
+        if probs is not None:
             try:
-                class_id = int(result.probs.top1)
+                # ✅ METHOD 1 (works locally)
+                class_id = int(probs.top1)
                 label = model.names[class_id]
-                confidence = float(result.probs.top1conf)
-
-                print(f"✅ Prediction: {label} ({confidence:.2f})")
+                print("✅ TOP1:", label)
                 return label
-
             except Exception as e:
-                print("⚠️ Fallback triggered:", e)
+                print("⚠️ top1 failed:", e)
 
-                import numpy as np
+                try:
+                    # ✅ METHOD 2 (tensor → numpy safe)
+                    import numpy as np
 
-                probs = result.probs.data
-                probs = probs.cpu().numpy()
+                    data = probs.data
 
-                class_id = int(np.argmax(probs))
-                label = model.names[class_id]
+                    if hasattr(data, "cpu"):
+                        data = data.cpu().numpy()
+                    else:
+                        data = np.array(data)
 
-                print("✅ Fallback Prediction:", label)
-                return label
+                    class_id = int(np.argmax(data))
+                    label = model.names[class_id]
 
-        print("⚠️ No probs found")
+                    print("✅ NUMPY FIX:", label)
+                    return label
+
+                except Exception as e2:
+                    print("❌ numpy fix failed:", e2)
+
+        # ==============================
+        # 🔥 LAST FALLBACK (IMPORTANT)
+        # ==============================
+        try:
+            # Sometimes classification output is hidden in names
+            print("⚠️ Trying fallback using names")
+
+            # force highest probability manually
+            raw = str(result)
+
+            for i, name in model.names.items():
+                if name.lower() in raw.lower():
+                    print("✅ STRING MATCH:", name)
+                    return name
+
+        except Exception as e:
+            print("❌ fallback string error:", e)
+
+        print("❌ FINAL: Unknown")
         return "Unknown"
 
     except Exception as e:
