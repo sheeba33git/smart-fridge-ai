@@ -19,11 +19,7 @@ def resource_path(relative_path):
 
 # ---------------- MODEL PATH ----------------
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-
-if getattr(sys, 'frozen', False):
-    MODEL_PATH = os.path.join(os.path.dirname(sys.executable), "best.pt")
-else:
-    MODEL_PATH = os.path.join(BASE_DIR, "best.pt")
+MODEL_PATH = os.path.join(BASE_DIR, "best.pt")
 
 # ---------------- MODEL LOAD ----------------
 model = None
@@ -32,17 +28,16 @@ def get_model():
     global model
     if model is None:
         try:
-            print("Loading model from:", MODEL_PATH)
+            print("📦 Loading model from:", MODEL_PATH)
 
             if not os.path.exists(MODEL_PATH):
-                print("❌ ERROR: best.pt not found!")
+                print("❌ best.pt NOT FOUND")
                 return None
 
             model = YOLO(MODEL_PATH)
 
-            print("✅ MODEL TYPE:", model.task)
-            print("✅ MODEL CLASSES:", model.names)
-            print("🔥 MODEL LOADED SUCCESSFULLY")
+            print("✅ MODEL LOADED")
+            print("Classes:", model.names)
 
         except Exception as e:
             print("❌ MODEL LOAD ERROR:", e)
@@ -62,81 +57,62 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 create_tables()
 
-# ---------------- AI ----------------
+# ---------------- AI (FINAL FIXED) ----------------
 def detect_vegetable(path):
     try:
         model = get_model()
-
         if model is None:
-            print("❌ Model not loaded")
             return "Unknown"
 
         results = model(path)
 
         if not results:
-            print("❌ No results returned")
+            print("❌ No results")
             return "Unknown"
 
         result = results[0]
 
-        # 🔥 DEBUG (important)
-        print("DEBUG result:", result)
-        print("DEBUG probs:", getattr(result, "probs", None))
-
-        # ==============================
-        # ✅ CASE 1: CLASSIFICATION MODEL
-        # ==============================
+        # =========================
+        # 🔥 MAIN FIX (WORKS ALWAYS)
+        # =========================
         if hasattr(result, "probs") and result.probs is not None:
+
+            probs = result.probs
+
+            # convert to numpy safely
             try:
-                class_id = int(result.probs.top1)
-                label = model.names[class_id]
-                confidence = float(result.probs.top1conf)
-
-                print(f"✅ CLASSIFY: {label} ({confidence:.2f})")
-                return label
-
-            except Exception as e:
-                print("⚠️ Error in probs handling:", e)
-
-                # fallback manual numpy handling
+                probs_array = probs.data.cpu().numpy()
+            except:
                 import numpy as np
+                probs_array = np.array(probs)
 
-                probs = result.probs
+            class_id = int(probs_array.argmax())
+            confidence = float(probs_array.max())
 
-                if hasattr(probs, "data"):
-                    probs = probs.data
+            label = model.names[class_id]
 
-                try:
-                    probs = probs.cpu().numpy()
-                except:
-                    probs = np.array(probs)
+            print(f"✅ PREDICTED: {label} ({confidence:.2f})")
 
-                class_id = int(np.argmax(probs))
-                label = model.names[class_id]
+            return label
 
-                print("✅ FALLBACK CLASSIFY:", label)
-                return label
-
-        # ==============================
-        # ⚠️ CASE 2: DETECTION MODEL (fallback)
-        # ==============================
-        if hasattr(result, "boxes") and result.boxes is not None and len(result.boxes) > 0:
-            try:
+        # =========================
+        # 🔥 DETECTION FALLBACK
+        # =========================
+        if hasattr(result, "boxes") and result.boxes is not None:
+            if len(result.boxes) > 0:
                 class_id = int(result.boxes.cls[0])
                 label = model.names[class_id]
 
                 print("⚠️ DETECTION MODE:", label)
                 return label
-            except Exception as e:
-                print("❌ Detection fallback error:", e)
 
-        # ==============================
         print("❌ No valid prediction")
         return "Unknown"
 
     except Exception as e:
         print("❌ FINAL ERROR:", e)
         return "Unknown"
+
 # ---------------- PROCESS ----------------
 def process_class(label):
     label = label.lower()
@@ -159,7 +135,7 @@ def process_class(label):
     print("⚠️ UNKNOWN LABEL:", label)
     return "Unknown", "Fresh"
 
-# ✅ FIXED FUNCTION
+# ---------------- EXPIRY ----------------
 def predict_expiry(veg, fresh):
     if fresh == "Spoiled":
         return 0
@@ -168,7 +144,6 @@ def predict_expiry(veg, fresh):
 # ---------------- STOCK ----------------
 def calculate_stock(data):
     stock = {}
-
     for item in data:
         veg = item[1]
         qty = item[6]
