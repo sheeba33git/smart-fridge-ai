@@ -1,13 +1,11 @@
 from ultralytics import YOLO
 
-# Load model
+# load model
 model = YOLO("best.pt")
 
-# Test image
-results = model.predict("test.jpg", show=True)
+# give a test image (put any vegetable image in same folder)
+results = model("test.jpg")
 
-for r in results:
-    probs = r.probs
-    if probs:
-        class_id = probs.top1
-        print("Prediction:", model.names[class_id])
+# print outputs
+print("FULL RESULT:", results[0])
+print("PROBS:", results[0].probs)

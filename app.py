@@ -68,30 +68,75 @@ def detect_vegetable(path):
         model = get_model()
 
         if model is None:
+            print("❌ Model not loaded")
             return "Unknown"
 
-        # ✅ CORRECT METHOD
-        results = model.predict(source=path)
+        results = model(path)
 
-        if not results or len(results) == 0:
+        if not results:
+            print("❌ No results returned")
             return "Unknown"
 
         result = results[0]
 
-        # ✅ SAFE CLASSIFICATION
-        if result.probs is not None:
-            class_id = int(result.probs.top1)
-            label = result.names[class_id]
+        # 🔥 DEBUG (important)
+        print("DEBUG result:", result)
+        print("DEBUG probs:", getattr(result, "probs", None))
 
-            print("✅ FINAL PREDICTION:", label)
-            return label
+        # ==============================
+        # ✅ CASE 1: CLASSIFICATION MODEL
+        # ==============================
+        if hasattr(result, "probs") and result.probs is not None:
+            try:
+                class_id = int(result.probs.top1)
+                label = model.names[class_id]
+                confidence = float(result.probs.top1conf)
 
+                print(f"✅ CLASSIFY: {label} ({confidence:.2f})")
+                return label
+
+            except Exception as e:
+                print("⚠️ Error in probs handling:", e)
+
+                # fallback manual numpy handling
+                import numpy as np
+
+                probs = result.probs
+
+                if hasattr(probs, "data"):
+                    probs = probs.data
+
+                try:
+                    probs = probs.cpu().numpy()
+                except:
+                    probs = np.array(probs)
+
+                class_id = int(np.argmax(probs))
+                label = model.names[class_id]
+
+                print("✅ FALLBACK CLASSIFY:", label)
+                return label
+
+        # ==============================
+        # ⚠️ CASE 2: DETECTION MODEL (fallback)
+        # ==============================
+        if hasattr(result, "boxes") and result.boxes is not None and len(result.boxes) > 0:
+            try:
+                class_id = int(result.boxes.cls[0])
+                label = model.names[class_id]
+
+                print("⚠️ DETECTION MODE:", label)
+                return label
+            except Exception as e:
+                print("❌ Detection fallback error:", e)
+
+        # ==============================
+        print("❌ No valid prediction")
         return "Unknown"
 
     except Exception as e:
         print("❌ FINAL ERROR:", e)
         return "Unknown"
-
 # ---------------- PROCESS ----------------
 def process_class(label):
     label = label.lower()
