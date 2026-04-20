@@ -188,31 +188,35 @@ def history():
 
 @app.route("/upload", methods=["POST"])
 def upload():
-    file = request.files["image"]
-    quantity = float(request.form.get("quantity", 1))
+    try:
+        file = request.files["image"]
+        quantity = float(request.form.get("quantity", 1))
 
-    filename = secure_filename(file.filename)
-    path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    file.save(path)
+        filename = secure_filename(file.filename)
+        path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        file.save(path)
 
-    label = detect_vegetable(path)
+        label = detect_vegetable(path)
+        print("🔥 RAW LABEL:", label)
 
-    # ✅ PRINT HERE (VERY IMPORTANT)
-    print("🔥 RAW LABEL FROM MODEL:", label)
+        veg, fresh = process_class(label)
+        expiry = predict_expiry(veg, fresh)
 
-    veg, fresh = process_class(label)
-    expiry = predict_expiry(veg, fresh)
+        insert_data(
+            veg,
+            fresh,
+            expiry,
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            filename,
+            quantity
+        )
 
-    insert_data(
-        veg,
-        fresh,
-        expiry,
-        datetime.now().strftime("%Y-%m-%d %H:%M"),
-        filename,
-        quantity
-    )
+        return redirect(url_for("dashboard"))
 
-    return redirect(url_for("dashboard"))
+    except Exception as e:
+        print("❌ UPLOAD ERROR:", e)   # 🔥 THIS WILL SHOW REAL ERROR
+        return "Error occurred. Check logs."
+   
 @app.route("/remove", methods=["POST"])
 def remove():
     veg = request.form.get("veg")
