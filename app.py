@@ -25,7 +25,7 @@ if getattr(sys, 'frozen', False):
 else:
     MODEL_PATH = os.path.join(BASE_DIR, "best.pt")
 
-# ---------------- LAZY LOAD MODEL ----------------
+# ---------------- MODEL LOAD ----------------
 model = None
 
 def get_model():
@@ -77,43 +77,18 @@ def detect_vegetable(path):
 
         result = results[0]
 
-        # 🔥 MOST STABLE METHOD
-        if hasattr(result, "names") and hasattr(result, "probs"):
+        # ✅ SIMPLE & STABLE
+        if result.probs is not None:
+            class_id = int(result.probs.top1)
+            label = result.names[class_id]
 
-            try:
-                # direct top1
-                class_id = int(result.probs.top1)
-                label = result.names[class_id]
-
-                print("✅ Predicted:", label)
-                return label
-
-            except Exception as e:
-                print("⚠️ top1 failed, using manual fallback:", e)
-
-                import numpy as np
-
-                probs = result.probs
-
-                # convert everything safely
-                if hasattr(probs, "data"):
-                    probs = probs.data
-
-                try:
-                    probs = probs.cpu().numpy()
-                except:
-                    probs = np.array(probs)
-
-                class_id = int(np.argmax(probs))
-                label = result.names[class_id]
-
-                print("✅ Fallback Predicted:", label)
-                return label
+            print("✅ PREDICTED:", label)
+            return label
 
         return "Unknown"
 
     except Exception as e:
-        print("❌ FINAL ERROR:", e)
+        print("❌ PREDICTION ERROR:", e)
         return "Unknown"
 
 # ---------------- PROCESS ----------------
@@ -126,7 +101,7 @@ def process_class(label):
         return "Tomato", "Fresh" if "fresh" in label else "Spoiled"
     if "cabbage" in label:
         return "Cabbage", "Fresh" if "fresh" in label else "Spoiled"
-    if "brinjal" in label or "brijal" in label:
+    if "brinjal" in label:
         return "Brinjal", "Fresh" if "fresh" in label else "Spoiled"
     if "carrot" in label:
         return "Carrot", "Fresh" if "fresh" in label else "Spoiled"
@@ -135,12 +110,18 @@ def process_class(label):
     if "apple" in label:
         return "Apple", "Fresh" if "fresh" in label else "Spoiled"
 
-    print("⚠️ UNKNOWN LABEL RECEIVED:", label)
+    print("⚠️ UNKNOWN LABEL:", label)
     return "Unknown", "Fresh"
+
+# ✅ MISSING FUNCTION FIXED
+def predict_expiry(veg, fresh):
+    if fresh == "Spoiled":
+        return 0
+    return 5
+
 # ---------------- STOCK ----------------
 def calculate_stock(data):
     stock = {}
-
     for item in data:
         veg = item[1]
         qty = item[6]
@@ -214,9 +195,9 @@ def upload():
         return redirect(url_for("dashboard"))
 
     except Exception as e:
-        print("❌ UPLOAD ERROR:", e)   # 🔥 THIS WILL SHOW REAL ERROR
+        print("❌ UPLOAD ERROR:", e)
         return "Error occurred. Check logs."
-   
+
 @app.route("/remove", methods=["POST"])
 def remove():
     veg = request.form.get("veg")
@@ -238,4 +219,4 @@ def clear():
 # ---------------- RUN ----------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host="0.0.0.0", port=port)
