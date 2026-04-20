@@ -70,25 +70,26 @@ def detect_vegetable(path):
         if model is None:
             return "Unknown"
 
-        results = model(path)
+        # ✅ CORRECT METHOD
+        results = model.predict(source=path)
 
-        if not results:
+        if not results or len(results) == 0:
             return "Unknown"
 
         result = results[0]
 
-        # ✅ SIMPLE & STABLE
+        # ✅ SAFE CLASSIFICATION
         if result.probs is not None:
             class_id = int(result.probs.top1)
             label = result.names[class_id]
 
-            print("✅ PREDICTED:", label)
+            print("✅ FINAL PREDICTION:", label)
             return label
 
         return "Unknown"
 
     except Exception as e:
-        print("❌ PREDICTION ERROR:", e)
+        print("❌ FINAL ERROR:", e)
         return "Unknown"
 
 # ---------------- PROCESS ----------------
@@ -97,23 +98,23 @@ def process_class(label):
 
     if "potato" in label:
         return "Potato", "Fresh" if "fresh" in label else "Spoiled"
-    if "tomato" in label:
+    elif "tomato" in label:
         return "Tomato", "Fresh" if "fresh" in label else "Spoiled"
-    if "cabbage" in label:
+    elif "cabbage" in label:
         return "Cabbage", "Fresh" if "fresh" in label else "Spoiled"
-    if "brinjal" in label:
+    elif "brinjal" in label:
         return "Brinjal", "Fresh" if "fresh" in label else "Spoiled"
-    if "carrot" in label:
+    elif "carrot" in label:
         return "Carrot", "Fresh" if "fresh" in label else "Spoiled"
-    if "banana" in label:
+    elif "banana" in label:
         return "Banana", "Fresh" if "fresh" in label else "Spoiled"
-    if "apple" in label:
+    elif "apple" in label:
         return "Apple", "Fresh" if "fresh" in label else "Spoiled"
 
     print("⚠️ UNKNOWN LABEL:", label)
     return "Unknown", "Fresh"
 
-# ✅ MISSING FUNCTION FIXED
+# ✅ FIXED FUNCTION
 def predict_expiry(veg, fresh):
     if fresh == "Spoiled":
         return 0
@@ -122,6 +123,7 @@ def predict_expiry(veg, fresh):
 # ---------------- STOCK ----------------
 def calculate_stock(data):
     stock = {}
+
     for item in data:
         veg = item[1]
         qty = item[6]
