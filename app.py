@@ -4,10 +4,14 @@ import sys
 from datetime import datetime
 from werkzeug.utils import secure_filename
 import sqlite3
+import logging
 
 from config import UPLOAD_FOLDER
 from database import create_tables, insert_data, get_all, update_quantity
 from ultralytics import YOLO
+
+# ---------------- LOGGING ----------------
+logging.basicConfig(level=logging.INFO)
 
 # ---------------- PATH FIX ----------------
 def resource_path(relative_path):
@@ -19,9 +23,13 @@ def resource_path(relative_path):
 
 # ---------------- MODEL PATH ----------------
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-MODEL_PATH = os.path.join(BASE_DIR, "best.pt")
 
-# ---------------- MODEL LOAD ----------------
+if getattr(sys, 'frozen', False):
+    MODEL_PATH = os.path.join(os.path.dirname(sys.executable), "best.pt")
+else:
+    MODEL_PATH = os.path.join(BASE_DIR, "best.pt")
+
+# ---------------- MODEL ----------------
 model = None
 
 def get_model():
@@ -37,7 +45,7 @@ def get_model():
             model = YOLO(MODEL_PATH)
 
             print("✅ MODEL LOADED")
-            print("Classes:", model.names)
+            print("📊 Classes:", model.names)
 
         except Exception as e:
             print("❌ MODEL LOAD ERROR:", e)
@@ -57,56 +65,48 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 create_tables()
 
-# ---------------- AI (FINAL FIXED) ----------------
+# ---------------- AI ----------------
 def detect_vegetable(path):
     try:
         model = get_model()
+
         if model is None:
+            print("⚠️ Model not available")
             return "Unknown"
 
         results = model(path)
 
         if not results:
-            print("❌ No results")
+            print("⚠️ No results")
             return "Unknown"
 
         result = results[0]
 
-        # =========================
-        # 🔥 MAIN FIX (WORKS ALWAYS)
-        # =========================
+        # ✅ CLASSIFICATION MODEL
         if hasattr(result, "probs") and result.probs is not None:
-
-            probs = result.probs
-
-            # convert to numpy safely
             try:
-                probs_array = probs.data.cpu().numpy()
-            except:
-                import numpy as np
-                probs_array = np.array(probs)
-
-            class_id = int(probs_array.argmax())
-            confidence = float(probs_array.max())
-
-            label = model.names[class_id]
-
-            print(f"✅ PREDICTED: {label} ({confidence:.2f})")
-
-            return label
-
-        # =========================
-        # 🔥 DETECTION FALLBACK
-        # =========================
-        if hasattr(result, "boxes") and result.boxes is not None:
-            if len(result.boxes) > 0:
-                class_id = int(result.boxes.cls[0])
+                class_id = int(result.probs.top1)
                 label = model.names[class_id]
+                confidence = float(result.probs.top1conf)
 
-                print("⚠️ DETECTION MODE:", label)
+                print(f"✅ Prediction: {label} ({confidence:.2f})")
                 return label
 
-        print("❌ No valid prediction")
+            except Exception as e:
+                print("⚠️ Fallback triggered:", e)
+
+                import numpy as np
+
+                probs = result.probs.data
+                probs = probs.cpu().numpy()
+
+                class_id = int(np.argmax(probs))
+                label = model.names[class_id]
+
+                print("✅ Fallback Prediction:", label)
+                return label
+
+        print("⚠️ No probs found")
         return "Unknown"
 
     except Exception as e:
@@ -123,7 +123,7 @@ def process_class(label):
         return "Tomato", "Fresh" if "fresh" in label else "Spoiled"
     elif "cabbage" in label:
         return "Cabbage", "Fresh" if "fresh" in label else "Spoiled"
-    elif "brinjal" in label:
+    elif "brinjal" in label or "brijal" in label:
         return "Brinjal", "Fresh" if "fresh" in label else "Spoiled"
     elif "carrot" in label:
         return "Carrot", "Fresh" if "fresh" in label else "Spoiled"
@@ -144,6 +144,7 @@ def predict_expiry(veg, fresh):
 # ---------------- STOCK ----------------
 def calculate_stock(data):
     stock = {}
+
     for item in data:
         veg = item[1]
         qty = item[6]
@@ -240,5 +241,6 @@ def clear():
 
 # ---------------- RUN ----------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
+    print(f"🚀 Running on port {port}")
     app.run(host="0.0.0.0", port=port)
