@@ -3,7 +3,6 @@ import os
 import sys
 import uuid
 from datetime import datetime
-from werkzeug.utils import secure_filename
 from PIL import Image
 import sqlite3
 import logging
@@ -82,7 +81,10 @@ def detect_vegetable(path):
             print("❌ Model not loaded")
             return "Unknown"
 
-        results = model(path)
+        # ✅ KEY FIX: open as PIL image and pass directly to YOLO
+        # This bypasses the numpy→torchvision bug on Render
+        pil_img = Image.open(path).convert("RGB")
+        results = model(pil_img)
 
         if not results:
             print("❌ No results")
@@ -95,14 +97,12 @@ def detect_vegetable(path):
             print("❌ No probs attribute in result")
             return "Unknown"
 
-        # ✅ FINAL FIX — handles ALL types Render can return
+        # ✅ Safe tensor conversion
         raw = probs.data
 
-        # Step 1: if it's a torch tensor, move to CPU first
         if hasattr(raw, "cpu"):
             raw = raw.cpu()
 
-        # Step 2: convert to numpy only if it's NOT already numpy
         if isinstance(raw, np.ndarray):
             data = raw.flatten().astype(np.float32)
         elif hasattr(raw, "numpy"):
@@ -241,6 +241,8 @@ def upload():
 
     except Exception as e:
         print("❌ UPLOAD ERROR:", e)
+        import traceback
+        traceback.print_exc()
         return "Error occurred. Check logs."
 
 @app.route("/remove", methods=["POST"])
