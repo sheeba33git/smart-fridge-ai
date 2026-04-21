@@ -6,12 +6,6 @@ from datetime import datetime
 from PIL import Image
 import sqlite3
 import logging
-import numpy as np
-
-try:
-    import pillow_avif
-except ImportError:
-    pass
 
 from config import UPLOAD_FOLDER
 from database import create_tables, insert_data, get_all, update_quantity
@@ -81,54 +75,35 @@ def detect_vegetable(path):
             print("❌ Model not loaded")
             return "Unknown"
 
-        # ✅ KEY FIX: open as PIL image and pass directly to YOLO
-        # This bypasses the numpy→torchvision bug on Render
-        pil_img = Image.open(path).convert("RGB")
-        results = model(pil_img)
+        # ✅ BEST PRACTICE: use PIL Image
+        img = Image.open(path).convert("RGB")
+
+        results = model(img)
 
         if not results:
             print("❌ No results")
             return "Unknown"
 
         result = results[0]
-        probs = getattr(result, "probs", None)
 
-        if probs is None:
-            print("❌ No probs attribute in result")
+        if result.probs is None:
+            print("❌ No probs found")
             return "Unknown"
 
-        # ✅ Safe tensor conversion
-        raw = probs.data
-
-        if hasattr(raw, "cpu"):
-            raw = raw.cpu()
-
-        if isinstance(raw, np.ndarray):
-            data = raw.flatten().astype(np.float32)
-        elif hasattr(raw, "numpy"):
-            data = raw.numpy().flatten().astype(np.float32)
-        else:
-            data = np.array(list(raw), dtype=np.float32).flatten()
-
-        print(f"📊 Probs shape: {data.shape}, type: {type(data)}")
-
-        class_id = int(np.argmax(data))
-        confidence = float(data[class_id])
-
-        print(f"🎯 class_id: {class_id}, confidence: {confidence:.2f}")
+        class_id = int(result.probs.top1)
+        confidence = float(result.probs.top1conf)
 
         if confidence < 0.4:
-            print(f"⚠️ Low confidence ({confidence:.2f}), returning Unknown")
+            print(f"⚠️ Low confidence: {confidence:.2f}")
             return "Unknown"
 
         label = model.names[class_id]
-        print(f"✅ Detected: {label} (confidence: {confidence:.2f})")
+
+        print(f"✅ Detected: {label} ({confidence:.2f})")
         return label
 
     except Exception as e:
-        print(f"❌ detect_vegetable ERROR: {e}")
-        import traceback
-        traceback.print_exc()
+        print("❌ ERROR in detect_vegetable:", e)
         return "Unknown"
 
 # ---------------- PROCESS ----------------
@@ -216,9 +191,10 @@ def upload():
         file = request.files["image"]
         quantity = float(request.form.get("quantity", 1))
 
-        # Force convert any format (avif, webp, png, etc.) to jpg
+        # ✅ Convert any format → JPG
         filename = str(uuid.uuid4()) + ".jpg"
         path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+
         img = Image.open(file.stream).convert("RGB")
         img.save(path, "JPEG")
 
@@ -241,8 +217,6 @@ def upload():
 
     except Exception as e:
         print("❌ UPLOAD ERROR:", e)
-        import traceback
-        traceback.print_exc()
         return "Error occurred. Check logs."
 
 @app.route("/remove", methods=["POST"])
