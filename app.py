@@ -88,19 +88,18 @@ def detect_vegetable(path):
             print("❌ No probs attribute in result")
             return "Unknown"
 
-        # ✅ FIXED: Normalize tensor → CPU → numpy → flat array
-        # Works on ALL environments: local, Render, CPU-only, GPU
-         data = probs.data
+        # ✅ FIXED BLOCK (INDENTATION CORRECT)
+        data = probs.data
 
-         if hasattr(data, "cpu"):
-             data = data.cpu()
+        if hasattr(data, "cpu"):
+            data = data.cpu()
 
-          if hasattr(data, "numpy"):
-              data = data.numpy()
-          elif not isinstance(data, np.ndarray):
-              data = np.array(data)
+        if hasattr(data, "numpy"):
+            data = data.numpy()
+        elif not isinstance(data, np.ndarray):
+            data = np.array(data)
 
-          data = np.array(data, dtype=np.float32).flatten()
+        data = np.array(data, dtype=np.float32).flatten()
 
         class_id = int(np.argmax(data))
         confidence = float(data[class_id])
@@ -110,6 +109,7 @@ def detect_vegetable(path):
             return "Unknown"
 
         label = model.names[class_id]
+
         print(f"✅ Detected: {label} (confidence: {confidence:.2f})")
         return label
 
@@ -121,7 +121,6 @@ def detect_vegetable(path):
 def process_class(label):
     label = label.lower()
 
-    # ✅ FIXED: Model outputs "Rotten", not "Spoiled" — check prefix correctly
     fresh = "Fresh" if label.startswith("fresh") else "Spoiled"
 
     if "tomato" in label:
