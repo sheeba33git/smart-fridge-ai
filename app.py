@@ -8,6 +8,7 @@ from PIL import Image
 import sqlite3
 import logging
 import numpy as np
+
 try:
     import pillow_avif
 except ImportError:
@@ -94,20 +95,27 @@ def detect_vegetable(path):
             print("❌ No probs attribute in result")
             return "Unknown"
 
-        data = probs.data
+        # ✅ FINAL FIX — handles ALL types Render can return
+        raw = probs.data
 
-        if hasattr(data, "cpu"):
-            data = data.cpu()
+        # Step 1: if it's a torch tensor, move to CPU first
+        if hasattr(raw, "cpu"):
+            raw = raw.cpu()
 
-        if hasattr(data, "numpy"):
-            data = data.numpy()
-        elif not isinstance(data, np.ndarray):
-            data = np.array(data)
+        # Step 2: convert to numpy only if it's NOT already numpy
+        if isinstance(raw, np.ndarray):
+            data = raw.flatten().astype(np.float32)
+        elif hasattr(raw, "numpy"):
+            data = raw.numpy().flatten().astype(np.float32)
+        else:
+            data = np.array(list(raw), dtype=np.float32).flatten()
 
-        data = np.array(data, dtype=np.float32).flatten()
+        print(f"📊 Probs shape: {data.shape}, type: {type(data)}")
 
         class_id = int(np.argmax(data))
         confidence = float(data[class_id])
+
+        print(f"🎯 class_id: {class_id}, confidence: {confidence:.2f}")
 
         if confidence < 0.4:
             print(f"⚠️ Low confidence ({confidence:.2f}), returning Unknown")
@@ -119,6 +127,8 @@ def detect_vegetable(path):
 
     except Exception as e:
         print(f"❌ detect_vegetable ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         return "Unknown"
 
 # ---------------- PROCESS ----------------
