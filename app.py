@@ -1,11 +1,17 @@
 from flask import Flask, render_template, request, redirect, url_for, send_from_directory
 import os
 import sys
+import uuid
 from datetime import datetime
 from werkzeug.utils import secure_filename
+from PIL import Image
 import sqlite3
 import logging
 import numpy as np
+try:
+    import pillow_avif
+except ImportError:
+    pass
 
 from config import UPLOAD_FOLDER
 from database import create_tables, insert_data, get_all, update_quantity
@@ -88,7 +94,6 @@ def detect_vegetable(path):
             print("❌ No probs attribute in result")
             return "Unknown"
 
-        # ✅ FIXED BLOCK (INDENTATION CORRECT)
         data = probs.data
 
         if hasattr(data, "cpu"):
@@ -109,7 +114,6 @@ def detect_vegetable(path):
             return "Unknown"
 
         label = model.names[class_id]
-
         print(f"✅ Detected: {label} (confidence: {confidence:.2f})")
         return label
 
@@ -202,9 +206,11 @@ def upload():
         file = request.files["image"]
         quantity = float(request.form.get("quantity", 1))
 
-        filename = secure_filename(file.filename)
+        # Force convert any format (avif, webp, png, etc.) to jpg
+        filename = str(uuid.uuid4()) + ".jpg"
         path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-        file.save(path)
+        img = Image.open(file.stream).convert("RGB")
+        img.save(path, "JPEG")
 
         label = detect_vegetable(path)
         print("🔥 RAW LABEL:", label)

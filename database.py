@@ -1,11 +1,12 @@
 import sqlite3
+import os
 
-DB_NAME = "fridge.db"
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DB_NAME = os.path.join(BASE_DIR, "fridge.db")
 
 def create_tables():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS fridge (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -17,10 +18,8 @@ def create_tables():
             quantity REAL
         )
     """)
-
     conn.commit()
     conn.close()
-
 
 # ✅ INSERT OR UPDATE (SMART LOGIC)
 def insert_data(veg, fresh, expiry, date, filename, quantity):
@@ -35,10 +34,10 @@ def insert_data(veg, fresh, expiry, date, filename, quantity):
         # ✅ UPDATE quantity instead of new row
         cursor.execute("""
             UPDATE fridge
-            SET quantity = quantity + ?, 
-                freshness = ?, 
-                expiry = ?, 
-                date = ?, 
+            SET quantity = quantity + ?,
+                freshness = ?,
+                expiry = ?,
+                date = ?,
                 filename = ?
             WHERE veg = ?
         """, (quantity, fresh, expiry, date, filename, veg))
@@ -52,13 +51,11 @@ def insert_data(veg, fresh, expiry, date, filename, quantity):
     conn.commit()
     conn.close()
 
-
 # ✅ REMOVE (UPDATE QUANTITY)
 def update_quantity(veg, quantity):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
-    # Get current quantity
     cursor.execute("SELECT quantity FROM fridge WHERE veg = ?", (veg,))
     result = cursor.fetchone()
 
@@ -78,16 +75,10 @@ def update_quantity(veg, quantity):
     conn.commit()
     conn.close()
 
-
 def get_all():
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
-    # ✅ Now only one row per vegetable
     cursor.execute("SELECT * FROM fridge ORDER BY id DESC")
-
     data = cursor.fetchall()
-
     conn.close()
-
     return data
